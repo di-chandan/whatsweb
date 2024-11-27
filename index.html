@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Multi-Client WhatsApp Bot Login</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
+    <div class="w-full max-w-4xl">
+        <h1 class="text-3xl font-bold text-center mb-6">WhatsApp Bot Login</h1>
+        
+        <div id="client-container" class="client-container bg-white p-6 rounded-xl shadow-lg">
+            <h2 class="text-xl font-semibold mb-4">Client Login</h2>
+            <div class="qr-container mb-4 flex justify-center">
+                <div id="qrcode" class="w-64 h-64 bg-gray-200 flex items-center justify-center">
+                    QR Code will appear here
+                </div>
+            </div>
+            <div id="status" class="mb-4 text-center text-gray-600">
+                Waiting for QR scan...
+            </div>
+            <button onclick="generateQR()" class="w-full bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 transition">
+                Generate Login QR
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io('http://localhost:3000');
+        var clientId = `client_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+        function generateQR(x) {
+			clientId = x ?? clientId; 
+            const qrContainer = document.getElementById('qrcode');
+            const statusDiv = document.getElementById('status');
+
+            socket.emit('generate-qr', clientId);
+            statusDiv.textContent = 'Generating QR Code...';
+        }
+
+        socket.on('qr-generated', (data) => {
+			console.log(data);
+			console.log(data.clientId+'/'+clientId);
+            if (data.clientId !== clientId) return; // Ensure this QR is for the current client
+
+            const qrContainer = document.getElementById('qrcode');
+            const statusDiv = document.getElementById('status');
+
+            const qr = qrcode(0, 'M');
+            qr.addData(data.qr);
+            qr.make();
+            
+            const imgTag = qr.createImgTag(5);
+            qrContainer.innerHTML = imgTag;
+            statusDiv.textContent = 'Scan QR Code with WhatsApp';
+        });
+
+        socket.on('login-success', (data) => {
+            if (data.clientId !== clientId) return; // Ensure this event is for the current client
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = `Logged in as: ${data.number}`;
+            statusDiv.classList.add('text-green-600');
+        });
+
+        socket.on('login-failed', (data) => {
+            if (data.clientId !== clientId) return; // Ensure this event is for the current client
+
+            const statusDiv = document.getElementById('status');
+            statusDiv.textContent = 'Login Failed. Try Again.';
+            statusDiv.classList.add('text-red-600');
+        });
+    </script>
+</body>
+</html>
